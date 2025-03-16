@@ -202,14 +202,19 @@ namespace SecureFileManager
             navPanel.Controls.Add(appTitle);
 
             // Add navigation buttons
-            Button logsButton = CreateNavButton("Logs", 70);
-            Button integrityButton = CreateNavButton("Integrity/Hashing", 110);
-            Button encryptionButton = CreateNavButton("Encryption", 150);
+            Button secureFolderButton = CreateNavButton("My Secure Folder", 70); // New button
+            Button logsButton = CreateNavButton("Logs", 110);
+            Button integrityButton = CreateNavButton("Integrity/Hashing", 150);
+            Button encryptionButton = CreateNavButton("Encryption", 190);
 
+            // Event handlers for buttons
+            secureFolderButton.Click += (sender, e) => ShowSecureFolderPage(); // New event handler
             logsButton.Click += (sender, e) => ShowLogsPage();
             integrityButton.Click += (sender, e) => ShowIntegrityPage();
             encryptionButton.Click += (sender, e) => ShowEncryptionPage();
 
+            // Add buttons to the navigation panel
+            navPanel.Controls.Add(secureFolderButton);
             navPanel.Controls.Add(logsButton);
             navPanel.Controls.Add(integrityButton);
             navPanel.Controls.Add(encryptionButton);
@@ -242,6 +247,58 @@ namespace SecureFileManager
                 TextAlign = ContentAlignment.MiddleLeft,
                 ImageAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(20, 0, 0, 0)
+            };
+        }
+
+        private void ShowSecureFolderPage()
+        {
+            // Create and show the secure folder page in the content panel
+            Panel contentArea = GetContentArea();
+            contentArea.BackColor = Color.FromArgb(240, 240, 245);
+
+            Label pageTitle = new Label
+            {
+                Text = "My Secure Folder",
+                Font = new Font("Arial", 14, FontStyle.Bold),
+                Location = new Point(20, 20),
+                AutoSize = true
+            };
+
+            // Add a ListView to display files in the secure folder
+            ListView secureFolderList = new ListView
+            {
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Location = new Point(20, 60),
+                Size = new Size(contentArea.Width - 40, contentArea.Height - 80)
+            };
+
+            secureFolderList.Columns.Add("File Name", 300);
+            secureFolderList.Columns.Add("Size", 100);
+            secureFolderList.Columns.Add("Last Modified", 150);
+
+            // Add sample files (replace with actual file loading logic)
+            string[] sampleFiles = {
+        "Document1.txt|1.2 MB|2025-03-16 08:30:22",
+        "Image1.jpg|3.5 MB|2025-03-15 12:45:10",
+        "Report.pdf|2.0 MB|2025-03-14 17:20:35"
+    };
+
+            foreach (string file in sampleFiles)
+            {
+                string[] parts = file.Split('|');
+                ListViewItem item = new ListViewItem(parts);
+                secureFolderList.Items.Add(item);
+            }
+
+            // Add controls to the content area
+            contentArea.Controls.Add(pageTitle);
+            contentArea.Controls.Add(secureFolderList);
+
+            // Adjust list view size when content area resizes
+            contentArea.Resize += (sender, e) => {
+                secureFolderList.Size = new Size(contentArea.Width - 40, contentArea.Height - 80);
             };
         }
 
