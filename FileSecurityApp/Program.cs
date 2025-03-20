@@ -1117,6 +1117,9 @@ namespace SecureFileManager
                     }
                 }
 
+                // Delete the original file after successful encryption
+                File.Delete(inputFile);
+
                 LogEvent("INFO", $"File encrypted using AES: {inputFile}", "Encryption");
             }
             catch (Exception ex)
@@ -1155,21 +1158,15 @@ namespace SecureFileManager
                     }
                 }
 
+                // Delete the encrypted file after successful decryption
+                File.Delete(inputFile);
+
                 LogEvent("INFO", $"File decrypted using AES: {inputFile}", "Decryption");
             }
             catch (Exception ex)
             {
                 LogEvent("ERROR", $"AES Decryption failed: {ex.Message}", "Decryption");
                 throw;
-            }
-        }
-
-        // Generate a 256-bit key from a password for AES
-        private byte[] GenerateKeyAES(string password)
-        {
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                return sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
             }
         }
 
@@ -1201,6 +1198,9 @@ namespace SecureFileManager
                         }
                     }
                 }
+
+                // Delete the original file after successful encryption
+                File.Delete(inputFile);
 
                 LogEvent("INFO", $"File encrypted using Triple DES: {inputFile}", "Encryption");
             }
@@ -1240,12 +1240,24 @@ namespace SecureFileManager
                     }
                 }
 
+                // Delete the encrypted file after successful decryption
+                File.Delete(inputFile);
+
                 LogEvent("INFO", $"File decrypted using Triple DES: {inputFile}", "Decryption");
             }
             catch (Exception ex)
             {
                 LogEvent("ERROR", $"Triple DES Decryption failed: {ex.Message}", "Decryption");
                 throw;
+            }
+        }
+
+        // Generate a 256-bit key from a password for AES
+        private byte[] GenerateKeyAES(string password)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                return sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
             }
         }
 
