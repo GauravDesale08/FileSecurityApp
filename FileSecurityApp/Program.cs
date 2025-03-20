@@ -4,6 +4,8 @@ using System.Drawing;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace SecureFileManager  // Make sure this matches your project namespace
 {
@@ -29,11 +31,31 @@ namespace SecureFileManager
         private Form loginForm;
         private Panel contentPanel;
         private Panel navPanel;
+        string logFilePath = @"C:\ProgramData\log.txt";
 
         public MainForm()
         {
             InitializeComponent();
             ShowLoginPage();
+        }
+        public void LogEvent(string level, string message, string source)
+        {
+            string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+            string logEntry = $"{timestamp} | {level} | {message} | {source}";
+
+             // Path where logs will be saved
+
+            try
+            {
+                using (StreamWriter sw = new StreamWriter(logFilePath, true)) // Append mode
+                {
+                    sw.WriteLine(logEntry);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error writing to log file: {ex.Message}");
+            }
         }
 
         private void InitializeComponent()
@@ -250,9 +272,13 @@ namespace SecureFileManager
             };
         }
 
+        private Button viewFolderButton;
+        private string secureFolderPath = @"C:\ProgramData\SecureFiles"; // Hidden Secure Folder Path
+        private ListView secureFolderList;
+        private FileSystemWatcher fileWatcher;
+
         private void ShowSecureFolderPage()
         {
-            // Create and show the secure folder page in the content panel
             Panel contentArea = GetContentArea();
             contentArea.BackColor = Color.FromArgb(240, 240, 245);
 
@@ -264,42 +290,127 @@ namespace SecureFileManager
                 AutoSize = true
             };
 
-            // Add a ListView to display files in the secure folder
-            ListView secureFolderList = new ListView
+            // Initialize ListView
+            secureFolderList = new ListView
             {
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 Location = new Point(20, 60),
-                Size = new Size(contentArea.Width - 40, contentArea.Height - 80)
+                Size = new Size(contentArea.Width - 40, contentArea.Height - 130)
             };
 
-            secureFolderList.Columns.Add("File Name", 300);
+            // Adding columns
+            secureFolderList.Columns.Add("File Name", 200);
             secureFolderList.Columns.Add("Size", 100);
             secureFolderList.Columns.Add("Last Modified", 150);
+            secureFolderList.Columns.Add("Creation Time", 150);  // ✅ Added Column
+            secureFolderList.Columns.Add("Last Accessed", 150);  // ✅ Added Column
 
-            // Add sample files (replace with actual file loading logic)
-            string[] sampleFiles = {
-        "Document1.txt|1.2 MB|2025-03-16 08:30:22",
-        "Image1.jpg|3.5 MB|2025-03-15 12:45:10",
-        "Report.pdf|2.0 MB|2025-03-14 17:20:35"
-    };
-
-            foreach (string file in sampleFiles)
+            // Initialize "View Secure Folder" button
+            viewFolderButton = new Button
             {
-                string[] parts = file.Split('|');
-                ListViewItem item = new ListViewItem(parts);
-                secureFolderList.Items.Add(item);
-            }
+                Text = "View Secure Folder",
+                Location = new Point(20, secureFolderList.Bottom + 10),
+                Size = new Size(200, 30)
+            };
 
-            // Add controls to the content area
+            viewFolderButton.Click += ViewSecureFolder; // Attach event
+
             contentArea.Controls.Add(pageTitle);
             contentArea.Controls.Add(secureFolderList);
+            contentArea.Controls.Add(viewFolderButton);
 
-            // Adjust list view size when content area resizes
-            contentArea.Resize += (sender, e) => {
-                secureFolderList.Size = new Size(contentArea.Width - 40, contentArea.Height - 80);
+            // Adjust UI on resize
+            contentArea.Resize += (sender, e) =>
+            {
+                secureFolderList.Size = new Size(contentArea.Width - 40, contentArea.Height - 130);
+                viewFolderButton.Location = new Point(20, secureFolderList.Bottom + 10);
             };
+
+            // Load existing files and start monitoring
+            LoadSecureFolderFiles();
+            StartFolderMonitoring();
+        }
+
+        // Load existing files in the secure folder
+        private void LoadSecureFolderFiles()
+        {
+            secureFolderList.Items.Clear(); // Clear previous items
+
+            if (!Directory.Exists(secureFolderPath))
+            {
+                Directory.CreateDirectory(secureFolderPath); // Ensure folder exists
+            }
+
+            DirectoryInfo dirInfo = new DirectoryInfo(secureFolderPath);
+            foreach (FileInfo file in dirInfo.GetFiles())
+            {
+                string[] row = {
+            file.Name,
+            (file.Length / 1024.0).ToString("F2") + " KB",
+            file.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+            file.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"),  // ✅ New Column Data
+            file.LastAccessTime.ToString("yyyy-MM-dd HH:mm:ss") // ✅ New Column Data
+        };
+                secureFolderList.Items.Add(new ListViewItem(row));
+            }
+        }
+
+        // Monitor secure folder for real-time changes
+        private void StartFolderMonitoring()
+        {
+            fileWatcher = new FileSystemWatcher
+            {
+                Path = secureFolderPath,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                Filter = "*.*", // Watch all file types
+                IncludeSubdirectories = true, // Monitor subfolders as well
+                EnableRaisingEvents = true
+            };
+
+            // Attach event handlers for file changes
+            fileWatcher.Created += OnFolderChanged;
+            fileWatcher.Deleted += OnFolderChanged;
+            fileWatcher.Changed += OnFolderChanged;
+            fileWatcher.Renamed += OnFileRenamed;
+        }
+
+        // Handles file created, modified, or deleted events
+        private void OnFolderChanged(object sender, FileSystemEventArgs e)
+        {
+            LogEvent("INFO", $"File {e.ChangeType}: {e.FullPath}", "FileSystem");
+            secureFolderList.Invoke((MethodInvoker)(() =>
+            {
+                LoadSecureFolderFiles(); // Refresh file list
+            }));
+        }
+
+        // Handles file rename event
+        private void OnFileRenamed(object sender, RenamedEventArgs e)
+        {
+            LogEvent("INFO", $"File renamed to {e.FullPath}", "FileSystem");
+            secureFolderList.Invoke((MethodInvoker)(() =>
+            {
+                LoadSecureFolderFiles(); // Refresh file list
+            }));
+        }
+
+        // Open secure folder in File Explorer
+        private void ViewSecureFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(secureFolderPath))
+            {
+                Directory.CreateDirectory(secureFolderPath);
+                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe");
+                psi.Arguments = $"/c attrib +s +h \"{secureFolderPath}\"";
+                Process.Start(psi);
+                System.Diagnostics.Process.Start("explorer.exe", secureFolderPath);
+            }
+            else
+            {
+                System.Diagnostics.Process.Start("explorer.exe", secureFolderPath);
+            }
         }
 
         private void ShowLogsPage()
@@ -330,23 +441,40 @@ namespace SecureFileManager
             logsList.Columns.Add("Message", 350);
             logsList.Columns.Add("Source", 120);
 
-            // Add sample log data
-            string[] sampleLogs = {
-                "2025-03-16 08:30:22|INFO|Application started|System",
-                "2025-03-16 08:31:05|INFO|User authentication successful|Authentication",
-                "2025-03-16 08:35:18|WARNING|Low disk space detected|Storage",
-                "2025-03-16 08:42:33|ERROR|Database connection failed|Database",
-                "2025-03-16 09:15:07|INFO|New file uploaded|FileSystem",
-                "2025-03-16 09:22:41|INFO|File encryption complete|Security",
-                "2025-03-16 09:30:55|WARNING|Network connectivity issues|Network"
-            };
+            // Load logs from file
+            //string logFilePath = @"C:\\Users\\LENOVO\\Desktop\\Vivek_MINI\\log.txt"; // Path where logs are saved
 
-            foreach (string log in sampleLogs)
+            if (!File.Exists(logFilePath)) // Check if log file exists
             {
-                string[] parts = log.Split('|');
-                ListViewItem item = new ListViewItem(parts);
-                logsList.Items.Add(item);
+                try
+                {
+                    File.WriteAllText(logFilePath, ""); // Create empty log file
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error creating log file: {ex.Message}", "Log Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return; // Exit if file cannot be created
+                }
             }
+
+            try
+            {
+                foreach (string log in File.ReadAllLines(logFilePath))
+                {
+                    string[] parts = log.Split('|'); // Log format: "timestamp | level | message | source"
+
+                    if (parts.Length == 4) // Ensure correct format
+                    {
+                        ListViewItem item = new ListViewItem(parts);
+                        logsList.Items.Add(item);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error reading log file: {ex.Message}", "Log Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
 
             contentArea.Controls.Add(pageTitle);
             contentArea.Controls.Add(logsList);
@@ -356,6 +484,7 @@ namespace SecureFileManager
                 logsList.Size = new Size(contentArea.Width - 40, contentArea.Height - 80);
             };
         }
+
 
         private void ShowIntegrityPage()
         {
@@ -466,9 +595,24 @@ namespace SecureFileManager
             browseButton.Click += (sender, e) => {
                 using (OpenFileDialog openFileDialog = new OpenFileDialog())
                 {
+                    openFileDialog.InitialDirectory = @"C:\ProgramData\SecureFiles"; // Secure Folder Path
+                    openFileDialog.Filter = "All Files|*.*"; // Allow all files (you can modify this)
+                    openFileDialog.Title = "Select a file from Secure Folder";
+
+                    // Restrict navigation outside the folder
                     if (openFileDialog.ShowDialog() == DialogResult.OK)
                     {
-                        fileTextBox.Text = openFileDialog.FileName;
+                        string selectedPath = openFileDialog.FileName;
+
+                        // Ensure the selected file is inside the secure folder
+                        if (selectedPath.StartsWith(@"C:\ProgramData\SecureFiles"))
+                        {
+                            fileTextBox.Text = selectedPath; // Show selected file path
+                        }
+                        else
+                        {
+                            MessageBox.Show("You can only select files from the Secure Folder!", "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
                     }
                 }
             };
