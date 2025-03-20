@@ -5,9 +5,8 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Diagnostics;
-using System.Threading.Tasks;
 
-namespace SecureFileManager  // Make sure this matches your project namespace
+namespace SecureFileManager
 {
     static class Program
     {
@@ -19,13 +18,7 @@ namespace SecureFileManager  // Make sure this matches your project namespace
             Application.Run(new MainForm());
         }
     }
-}
 
-
-
-
-namespace SecureFileManager
-{
     public partial class MainForm : Form
     {
         private Form loginForm;
@@ -38,12 +31,11 @@ namespace SecureFileManager
             InitializeComponent();
             ShowLoginPage();
         }
+
         public void LogEvent(string level, string message, string source)
         {
             string timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
             string logEntry = $"{timestamp} | {level} | {message} | {source}";
-
-            // Path where logs will be saved
 
             try
             {
@@ -442,8 +434,6 @@ namespace SecureFileManager
             logsList.Columns.Add("Source", 120);
 
             // Load logs from file
-            //string logFilePath = @"C:\\Users\\LENOVO\\Desktop\\Vivek_MINI\\log.txt"; // Path where logs are saved
-
             if (!File.Exists(logFilePath)) // Check if log file exists
             {
                 try
@@ -475,7 +465,6 @@ namespace SecureFileManager
                 MessageBox.Show($"Error reading log file: {ex.Message}", "Log Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
-
             contentArea.Controls.Add(pageTitle);
             contentArea.Controls.Add(logsList);
 
@@ -484,7 +473,6 @@ namespace SecureFileManager
                 logsList.Size = new Size(contentArea.Width - 40, contentArea.Height - 80);
             };
         }
-
 
         private void ShowIntegrityPage()
         {
@@ -1003,6 +991,7 @@ namespace SecureFileManager
             showPassDecryptCheckBox.CheckedChanged += (sender, e) => {
                 passwordDecryptTextBox.PasswordChar = showPassDecryptCheckBox.Checked ? '\0' : '*';
             };
+
             encryptButton.Click += (sender, e) => {
                 if (string.IsNullOrEmpty(fileToEncryptTextBox.Text) ||
                     string.IsNullOrEmpty(outputEncryptTextBox.Text) ||
@@ -1018,13 +1007,15 @@ namespace SecureFileManager
                 }
                 try
                 {
-                    // In a real application, you'd use encryption algorithms
-                    // This is just a simple file copy to demonstrate the workflow
-                    File.Copy(fileToEncryptTextBox.Text, outputEncryptTextBox.Text, true);
-
-                    // Delete the original file after successful encryption
-                    File.Delete(fileToEncryptTextBox.Text);
-
+                    string algorithm = algorithmEncryptCombo.SelectedItem.ToString();
+                    if (algorithm == "AES-256")
+                    {
+                        EncryptFileAES(fileToEncryptTextBox.Text, outputEncryptTextBox.Text, passwordEncryptTextBox.Text);
+                    }
+                    else if (algorithm == "Triple DES")
+                    {
+                        EncryptFileTripleDES(fileToEncryptTextBox.Text, outputEncryptTextBox.Text, passwordEncryptTextBox.Text);
+                    }
                     encryptStatusLabel.Text = "Encryption successful! Original file deleted.";
                     encryptStatusLabel.ForeColor = Color.Green;
                     MessageBox.Show("File encrypted successfully! Original file deleted.");
@@ -1046,13 +1037,15 @@ namespace SecureFileManager
                 }
                 try
                 {
-                    // In a real application, you'd use decryption algorithms
-                    // This is just a simple file copy to demonstrate the workflow
-                    File.Copy(fileToDecryptTextBox.Text, outputDecryptTextBox.Text, true);
-
-                    // Delete the encrypted file after successful decryption
-                    File.Delete(fileToDecryptTextBox.Text);
-
+                    string algorithm = algorithmEncryptCombo.SelectedItem.ToString();
+                    if (algorithm == "AES-256")
+                    {
+                        DecryptFileAES(fileToDecryptTextBox.Text, outputDecryptTextBox.Text, passwordDecryptTextBox.Text);
+                    }
+                    else if (algorithm == "Triple DES")
+                    {
+                        DecryptFileTripleDES(fileToDecryptTextBox.Text, outputDecryptTextBox.Text, passwordDecryptTextBox.Text);
+                    }
                     decryptStatusLabel.Text = "Decryption successful! Encrypted file deleted.";
                     decryptStatusLabel.ForeColor = Color.Green;
                     MessageBox.Show("File decrypted successfully! Encrypted file deleted.");
@@ -1094,7 +1087,190 @@ namespace SecureFileManager
             contentPanel.Controls.Add(contentArea);
             return contentArea;
         }
+
+        // Encrypt a file using AES-256
+        private void EncryptFileAES(string inputFile, string outputFile, string password)
+        {
+            try
+            {
+                // Generate a key and IV from the password
+                byte[] key = GenerateKeyAES(password);
+                byte[] iv = GenerateIV();
+
+                // Create AES encryption algorithm
+                using (Aes aes = Aes.Create())
+                {
+                    aes.Key = key;
+                    aes.IV = iv;
+
+                    // Create output file and write the IV (needed for decryption)
+                    using (FileStream outputStream = new FileStream(outputFile, FileMode.Create))
+                    {
+                        outputStream.Write(iv, 0, iv.Length); // Write IV to the beginning of the file
+
+                        // Encrypt the file
+                        using (CryptoStream cryptoStream = new CryptoStream(outputStream, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                        using (FileStream inputStream = new FileStream(inputFile, FileMode.Open))
+                        {
+                            inputStream.CopyTo(cryptoStream);
+                        }
+                    }
+                }
+
+                LogEvent("INFO", $"File encrypted using AES: {inputFile}", "Encryption");
+            }
+            catch (Exception ex)
+            {
+                LogEvent("ERROR", $"AES Encryption failed: {ex.Message}", "Encryption");
+                throw;
+            }
+        }
+
+        // Decrypt a file using AES-256
+        private void DecryptFileAES(string inputFile, string outputFile, string password)
+        {
+            try
+            {
+                // Generate a key from the password
+                byte[] key = GenerateKeyAES(password);
+
+                // Read the IV from the beginning of the file
+                byte[] iv = new byte[16]; // AES IV is always 16 bytes
+                using (FileStream inputStream = new FileStream(inputFile, FileMode.Open))
+                {
+                    inputStream.Read(iv, 0, iv.Length); // Read IV from the file
+
+                    // Create AES decryption algorithm
+                    using (Aes aes = Aes.Create())
+                    {
+                        aes.Key = key;
+                        aes.IV = iv;
+
+                        // Decrypt the file
+                        using (CryptoStream cryptoStream = new CryptoStream(inputStream, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                        using (FileStream outputStream = new FileStream(outputFile, FileMode.Create))
+                        {
+                            cryptoStream.CopyTo(outputStream);
+                        }
+                    }
+                }
+
+                LogEvent("INFO", $"File decrypted using AES: {inputFile}", "Decryption");
+            }
+            catch (Exception ex)
+            {
+                LogEvent("ERROR", $"AES Decryption failed: {ex.Message}", "Decryption");
+                throw;
+            }
+        }
+
+        // Generate a 256-bit key from a password for AES
+        private byte[] GenerateKeyAES(string password)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                return sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
+            }
+        }
+
+        // Encrypt a file using Triple DES
+        private void EncryptFileTripleDES(string inputFile, string outputFile, string password)
+        {
+            try
+            {
+                // Generate a key and IV from the password
+                byte[] key = GenerateKeyTripleDES(password);
+                byte[] iv = GenerateIV();
+
+                // Create Triple DES encryption algorithm
+                using (TripleDES tripleDes = TripleDES.Create())
+                {
+                    tripleDes.Key = key;
+                    tripleDes.IV = iv;
+
+                    // Create output file and write the IV (needed for decryption)
+                    using (FileStream outputStream = new FileStream(outputFile, FileMode.Create))
+                    {
+                        outputStream.Write(iv, 0, iv.Length); // Write IV to the beginning of the file
+
+                        // Encrypt the file
+                        using (CryptoStream cryptoStream = new CryptoStream(outputStream, tripleDes.CreateEncryptor(), CryptoStreamMode.Write))
+                        using (FileStream inputStream = new FileStream(inputFile, FileMode.Open))
+                        {
+                            inputStream.CopyTo(cryptoStream);
+                        }
+                    }
+                }
+
+                LogEvent("INFO", $"File encrypted using Triple DES: {inputFile}", "Encryption");
+            }
+            catch (Exception ex)
+            {
+                LogEvent("ERROR", $"Triple DES Encryption failed: {ex.Message}", "Encryption");
+                throw;
+            }
+        }
+
+        // Decrypt a file using Triple DES
+        private void DecryptFileTripleDES(string inputFile, string outputFile, string password)
+        {
+            try
+            {
+                // Generate a key from the password
+                byte[] key = GenerateKeyTripleDES(password);
+
+                // Read the IV from the beginning of the file
+                byte[] iv = new byte[8]; // Triple DES IV is 8 bytes
+                using (FileStream inputStream = new FileStream(inputFile, FileMode.Open))
+                {
+                    inputStream.Read(iv, 0, iv.Length); // Read IV from the file
+
+                    // Create Triple DES decryption algorithm
+                    using (TripleDES tripleDes = TripleDES.Create())
+                    {
+                        tripleDes.Key = key;
+                        tripleDes.IV = iv;
+
+                        // Decrypt the file
+                        using (CryptoStream cryptoStream = new CryptoStream(inputStream, tripleDes.CreateDecryptor(), CryptoStreamMode.Read))
+                        using (FileStream outputStream = new FileStream(outputFile, FileMode.Create))
+                        {
+                            cryptoStream.CopyTo(outputStream);
+                        }
+                    }
+                }
+
+                LogEvent("INFO", $"File decrypted using Triple DES: {inputFile}", "Decryption");
+            }
+            catch (Exception ex)
+            {
+                LogEvent("ERROR", $"Triple DES Decryption failed: {ex.Message}", "Decryption");
+                throw;
+            }
+        }
+
+        // Generate a 192-bit key from a password for Triple DES
+        private byte[] GenerateKeyTripleDES(string password)
+        {
+            using (MD5 md5 = MD5.Create())
+            {
+                byte[] hash = md5.ComputeHash(Encoding.UTF8.GetBytes(password));
+                byte[] key = new byte[24]; // Triple DES requires a 192-bit key (24 bytes)
+                Array.Copy(hash, 0, key, 0, 16); // Copy first 16 bytes
+                Array.Copy(hash, 0, key, 16, 8); // Repeat first 8 bytes to make 24 bytes
+                return key;
+            }
+        }
+
+        // Generate a random IV (Initialization Vector)
+        private byte[] GenerateIV()
+        {
+            using (var rng = new RNGCryptoServiceProvider())
+            {
+                byte[] iv = new byte[16]; // AES uses 16 bytes, Triple DES uses 8 bytes
+                rng.GetBytes(iv);
+                return iv;
+            }
+        }
     }
 }
-
-
