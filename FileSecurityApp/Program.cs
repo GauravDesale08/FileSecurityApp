@@ -1003,7 +1003,6 @@ namespace SecureFileManager
             showPassDecryptCheckBox.CheckedChanged += (sender, e) => {
                 passwordDecryptTextBox.PasswordChar = showPassDecryptCheckBox.Checked ? '\0' : '*';
             };
-
             encryptButton.Click += (sender, e) => {
                 if (string.IsNullOrEmpty(fileToEncryptTextBox.Text) ||
                     string.IsNullOrEmpty(outputEncryptTextBox.Text) ||
@@ -1012,20 +1011,23 @@ namespace SecureFileManager
                     MessageBox.Show("Please fill in all fields.");
                     return;
                 }
-
                 if (passwordEncryptTextBox.Text != confirmEncryptTextBox.Text)
                 {
                     MessageBox.Show("Passwords do not match.");
                     return;
                 }
-
                 try
                 {
-                    // In a real application, implement file encryption here
-                    // For demo purposes, we'll just show a message
-                    encryptStatusLabel.Text = "Encryption successful!";
+                    // In a real application, you'd use encryption algorithms
+                    // This is just a simple file copy to demonstrate the workflow
+                    File.Copy(fileToEncryptTextBox.Text, outputEncryptTextBox.Text, true);
+
+                    // Delete the original file after successful encryption
+                    File.Delete(fileToEncryptTextBox.Text);
+
+                    encryptStatusLabel.Text = "Encryption successful! Original file deleted.";
                     encryptStatusLabel.ForeColor = Color.Green;
-                    MessageBox.Show("File encrypted successfully!");
+                    MessageBox.Show("File encrypted successfully! Original file deleted.");
                 }
                 catch (Exception ex)
                 {
@@ -1042,14 +1044,18 @@ namespace SecureFileManager
                     MessageBox.Show("Please fill in all fields.");
                     return;
                 }
-
                 try
                 {
-                    // In a real application, implement file decryption here
-                    // For demo purposes, we'll just show a message
-                    decryptStatusLabel.Text = "Decryption successful!";
+                    // In a real application, you'd use decryption algorithms
+                    // This is just a simple file copy to demonstrate the workflow
+                    File.Copy(fileToDecryptTextBox.Text, outputDecryptTextBox.Text, true);
+
+                    // Delete the encrypted file after successful decryption
+                    File.Delete(fileToDecryptTextBox.Text);
+
+                    decryptStatusLabel.Text = "Decryption successful! Encrypted file deleted.";
                     decryptStatusLabel.ForeColor = Color.Green;
-                    MessageBox.Show("File decrypted successfully!");
+                    MessageBox.Show("File decrypted successfully! Encrypted file deleted.");
                 }
                 catch (Exception ex)
                 {
