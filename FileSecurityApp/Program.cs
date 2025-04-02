@@ -1758,14 +1758,20 @@ namespace SecureFileManager
                     // Perform the encryption
                     EncryptFile(inputFilePath, outputFilePath, passwordTextBox.Text);
 
+                    // Delete the original file after successful encryption
+                    File.Delete(inputFilePath);
+
                     progressBar.Value = 100;
-                    statusMessageLabel.Text = "Encryption complete! Output file: " + Path.GetFileName(outputFilePath);
+                    statusMessageLabel.Text = "Encryption complete! Original file deleted. Output file: " + Path.GetFileName(outputFilePath);
                     statusMessageLabel.ForeColor = successColor;
 
-                    LogEvent("INFO", $"File encrypted: {Path.GetFileName(inputFilePath)}", "Encryption");
+                    // Update the file path text box to point to the encrypted file
+                    filePathTextBox.Text = outputFilePath;
+
+                    LogEvent("INFO", $"File encrypted and original deleted: {Path.GetFileName(inputFilePath)}", "Encryption");
 
                     // Ask if user wants to open the folder containing the encrypted file
-                    if (MessageBox.Show("Encryption successful. Would you like to open the folder containing the encrypted file?",
+                    if (MessageBox.Show("Encryption successful. Original file deleted. Would you like to open the folder containing the encrypted file?",
                         "Encryption Complete", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                     {
                         Process.Start("explorer.exe", "/select," + outputFilePath);
@@ -1825,14 +1831,20 @@ namespace SecureFileManager
                     // Perform the decryption
                     DecryptFile(inputFilePath, outputFilePath, passwordTextBox.Text);
 
+                    // Delete the encrypted file after successful decryption
+                    File.Delete(inputFilePath);
+
                     progressBar.Value = 100;
-                    statusMessageLabel.Text = "Decryption complete! Output file: " + Path.GetFileName(outputFilePath);
+                    statusMessageLabel.Text = "Decryption complete! Encrypted file deleted. Output file: " + Path.GetFileName(outputFilePath);
                     statusMessageLabel.ForeColor = successColor;
 
-                    LogEvent("INFO", $"File decrypted: {Path.GetFileName(inputFilePath)}", "Encryption");
+                    // Update the file path text box to point to the decrypted file
+                    filePathTextBox.Text = outputFilePath;
+
+                    LogEvent("INFO", $"File decrypted and encrypted file deleted: {Path.GetFileName(inputFilePath)}", "Encryption");
 
                     // Ask if user wants to open the folder containing the decrypted file
-                    if (MessageBox.Show("Decryption successful. Would you like to open the folder containing the decrypted file?",
+                    if (MessageBox.Show("Decryption successful. Encrypted file deleted. Would you like to open the folder containing the decrypted file?",
                         "Decryption Complete", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
                     {
                         Process.Start("explorer.exe", "/select," + outputFilePath);
